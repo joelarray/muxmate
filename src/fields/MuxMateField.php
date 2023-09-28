@@ -15,8 +15,10 @@ use craft\helpers\ElementHelper;
 use craft\helpers\Html;
 use craft\helpers\StringHelper;
 use craft\web\View;
+use GraphQL\Type\Definition\Type;
 
 use vaersaagod\muxmate\models\MuxMateFieldAttributes;
+use vaersaagod\muxmate\gql\types\generators\MuxMateGenerator;
 
 use yii\base\InvalidConfigException;
 use yii\db\Schema;
@@ -93,6 +95,20 @@ class MuxMateField extends Field implements PreviewableFieldInterface
     public function useFieldset(): bool
     {
         return true;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getContentGqlType(): Type|array
+    {
+        $typeArray = MuxMateGenerator::generateTypes($this);
+
+        return [
+            'name' => $this->handle,
+            'description' => 'Mux Mate field',
+            'type' => array_shift($typeArray),
+        ];
     }
 
     /**
