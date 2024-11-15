@@ -17,6 +17,7 @@ use craft\helpers\StringHelper;
 use craft\web\View;
 use GraphQL\Type\Definition\Type;
 
+use vaersaagod\muxmate\helpers\MuxMateHelper;
 use vaersaagod\muxmate\models\MuxMateFieldAttributes;
 use vaersaagod\muxmate\gql\types\generators\MuxMateGenerator;
 
@@ -33,7 +34,7 @@ class MuxMateField extends Field implements PreviewableFieldInterface
         return Craft::t('_muxmate', 'MuxMate');
     }
 
-    public static function valueType(): string
+    public static function phpType(): string
     {
         return 'mixed';
     }
@@ -43,8 +44,11 @@ class MuxMateField extends Field implements PreviewableFieldInterface
      * @param ElementInterface $element
      * @return string
      */
-    public function getTableAttributeHtml(mixed $value, ElementInterface $element): string
+    public function getPreviewHtml(mixed $value, ElementInterface $element): string
     {
+        if (!$element instanceof Asset || $element->kind !== Asset::KIND_VIDEO) {
+            return '';
+        }
         if (!$value instanceof MuxMateFieldAttributes || !$value->muxAssetId) {
             $label = \Craft::t('_muxmate', 'Video does not have a Mux asset');
             $content = '❌';
@@ -57,6 +61,13 @@ class MuxMateField extends Field implements PreviewableFieldInterface
             } else {
                 $label = \Craft::t('_muxmate', 'Mux video is ready to play!');
                 $content = '👍';
+                try {
+                    if (MuxMateHelper::getMuxPlaybackId($element, MuxMateHelper::PLAYBACK_POLICY_SIGNED)) {
+                        $content .= '🔒';
+                    }
+                } catch (\Throwable $e) {
+                    Craft::error($e, __METHOD__);
+                }
             }
         }
         return Html::tag('span', $content, [
@@ -83,11 +94,10 @@ class MuxMateField extends Field implements PreviewableFieldInterface
     /**
      * @inheritdoc
      */
-    public function getContentColumnType(): array|string
+    public static function dbType(): array|string
     {
         return [
             'muxAssetId' => Schema::TYPE_STRING,
-            'muxPlaybackId' => Schema::TYPE_STRING,
             'muxMetaData' => Schema::TYPE_TEXT,
         ];
     }
@@ -114,7 +124,7 @@ class MuxMateField extends Field implements PreviewableFieldInterface
     /**
      * @throws InvalidConfigException
      */
-    public function normalizeValue(mixed $value, ElementInterface $element = null): mixed
+    public function normalizeValue(mixed $value, ?ElementInterface $element = null): mixed
     {
         if ($value instanceof MuxMateFieldAttributes) {
             return $value;
@@ -125,7 +135,7 @@ class MuxMateField extends Field implements PreviewableFieldInterface
         ]);
     }
 
-    protected function inputHtml(mixed $value, ElementInterface $element = null): string
+    protected function inputHtml(mixed $value, ElementInterface $element = null, bool $inline = false): string
     {
         if (!$element instanceof Asset || $element->kind !== Asset::KIND_VIDEO) {
             $warningTip = new Tip([
@@ -159,8 +169,8 @@ class MuxMateField extends Field implements PreviewableFieldInterface
 
     protected function searchKeywords(mixed $value, ElementInterface $element): string
     {
-        if ($value instanceof MuxMateFieldAttributes && $value->muxPlaybackId) {
-            return $value->muxPlaybackId;
+        if ($value instanceof MuxMateFieldAttributes) {
+            return $value->muxAssetId;
         }
         return '';
     }
@@ -175,23 +185,18 @@ class MuxMateField extends Field implements PreviewableFieldInterface
         }
         /** @var ElementQuery $query */
         $column = ElementHelper::fieldColumnFromField($this);
-        $playbackIdColumn = StringHelper::replace($column, $this->handle, "{$this->handle}_muxPlaybackId");
         $metaDataColumn = StringHelper::replace($column, $this->handle, "{$this->handle}_muxMetaData");
-        if (is_array($value) && (isset($value['muxAssetId']) || isset($value['muxPlaybackId']))) {
-            if (isset($value['muxAssetId'])) {
-                $query->subQuery->andWhere(Db::parseParam("content.$column", $value['muxAssetId']));
-            }
-            if (isset($value['muxPlaybackId'])) {
-                $query->subQuery->andWhere(Db::parseParam("content.$playbackIdColumn", $value['muxPlaybackId']));
-            }
-            if (isset($value['muxMetaData'])) {
-                $query->subQuery->andWhere(Db::parseParam("content.$metaDataColumn", $value['muxMetaData']));
+        if (is_array($value)) {
+            $keys = array_keys($value);
+            foreach ($keys as $key) {
+                $query
+                    ->subQuery
+                    ->andWhere(Db::parseParam("JSON_EXTRACT(content.$metaDataColumn, '$.$key')", $value[$key]));
             }
         } else {
             $query
                 ->subQuery
-                ->andWhere(Db::parseParam("content.$column", $value))
-                ->andWhere(Db::parseParam("content.$playbackIdColumn", $value));
+                ->andWhere(Db::parseParam("content.$column", $value));
         }
     }
 

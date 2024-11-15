@@ -1,48 +1,9 @@
 # MuxMate Changelog
 
-## 1.2.0 - 2023-07-01
+## 3.0.1 - 2024-08-22
+### Fixed
+- Fixed some minor Craft 5 compatibility issues
+
+## 3.0.0 - 2024-08-22
 ### Added
-- Added the ability to have MuxMate automatically lazyload the `<mux-video>` web component
-- Added the ability to have MuxMate *not* load the `<mux-video>` web component JS library at all
-- Added the `lazyloadMuxVideo` config setting  
-- Added the `scriptSrcNonce` config setting  
-### Changed
-- The `muxVideoUrl` config setting now supports a `false` value, in which case MuxMate will not load the `<mux-video>` library
-- The `Asset::getMuxVideo()` method no longer returns `null`, avoiding a PHP exception that would occur if using the `|attr()` filter directly on its output.
-### Improved  
-- Improved video previews when assets are missing their Mux playback ID  
-
-## 1.1.3 - 2023-06-23
-### Fixed
-- Fixed dumb bug
-
-## 1.1.2 - 2023-06-21
-### Fixed 
-- Fixed an issue where not all params passed to `getMuxImageUrl()` would make it 
-
-## 1.1.1 - 2023-06-21
-### Fixed  
-- Fixed a PHP exception due to a typing error
-
-## 1.1.0 - 2023-06-21
-### Added  
-- Added the `isMuxVideo()` and `isMuxVideoReady()` asset methods.  
-
-## 1.0.3 - 2023-06-21
-### Fixed
-- Fixed an issue where the `getMuxAspectRatio()` always returned `1`
-
-## 1.0.2 - 2023-06-13
-### Improved
-- More emoji statuses in MuxMate field table attributes 🎉
-### Changed
-- MuxMate now requires PHP 8.1+
-- MuxMate fields now only uses the Mux asset ID for the search index
-
-## 1.0.1 - 2023-06-13
-### Fixed
-- Fixed some visual bugs in the MuxMate input field template
-
-## 1.0.0 - 2023-06-13
-### Added
-- Initial release
+- Added support for Craft 5

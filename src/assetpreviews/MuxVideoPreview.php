@@ -18,12 +18,12 @@ class MuxVideoPreview extends Video
      * @throws \Twig\Error\RuntimeError
      * @throws \Twig\Error\SyntaxError
      * @throws \yii\base\Exception
-     * @throws \yii\base\NotSupportedException
+     * @throws \yii\base\InvalidConfigException
      */
     public function getPreviewHtml(array $variables = []): string
     {
         return \Craft::$app->getView()->renderTemplate('_muxmate/_mux-video-preview.twig', [
-            'playbackId' => MuxMateHelper::getMuxPlaybackId($this->asset),
+            'playbackId' => MuxMateHelper::getMuxPlaybackId($this->asset, MuxMateHelper::PLAYBACK_POLICY_PUBLIC),
             'playerUrl' => MuxMate::MUX_PLAYER_URL,
         ], View::TEMPLATE_MODE_CP);
     }

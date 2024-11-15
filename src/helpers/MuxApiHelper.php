@@ -2,26 +2,20 @@
 
 namespace vaersaagod\muxmate\helpers;
 
-use craft\helpers\UrlHelper;
-
 use MuxPhp\Api\AssetsApi;
 use MuxPhp\ApiException;
 use MuxPhp\Configuration;
 use MuxPhp\Models\Asset as MuxAsset;
 use MuxPhp\Models\CreateAssetRequest;
+use MuxPhp\Models\CreatePlaybackIDRequest;
 use MuxPhp\Models\InputSettings;
+use MuxPhp\Models\PlaybackID;
 use MuxPhp\Models\PlaybackPolicy;
 
 use vaersaagod\muxmate\MuxMate;
 
-class MuxApiHelper
+final class MuxApiHelper
 {
-
-    /** @var string */
-    const MUX_STREAMING_DOMAIN = 'https://stream.mux.com';
-
-    /** @var string */
-    const MUX_IMAGE_DOMAIN = 'https://image.mux.com';
 
     /**
      * @param string $inputUrl The URL to the input asset
@@ -32,14 +26,21 @@ class MuxApiHelper
     public static function createAsset(string $inputUrl): ?MuxAsset
     {
 
-        $apiClient = static::getApiClient();
+        $apiClient = MuxApiHelper::getApiClient();
 
         $input = new InputSettings(['url' => $inputUrl]);
 
+        $maxResolutionTier = MuxMate::getInstance()->getSettings()->maxResolutionTier ?? '1080p';
+        $maxResolutionTiers = ['1080p', '1440p', '2160p'];
+        if (!in_array($maxResolutionTier, $maxResolutionTiers, true)) {
+            throw new \Exception("Invalid max resolution tier \"$maxResolutionTier\". Needs to be one of " . implode(', ', $maxResolutionTiers));
+        }
+
         $createAssetRequest = new CreateAssetRequest([
             'input' => $input,
-            'playback_policy' => [PlaybackPolicy::_PUBLIC],
+            'max_resolution_tier' => $maxResolutionTier,
             'mp4_support' => 'standard',
+            'playback_policy' => [PlaybackPolicy::_PUBLIC, PlaybackPolicy::SIGNED],
         ]);
 
         $result = $apiClient->createAsset($createAssetRequest);
@@ -56,7 +57,7 @@ class MuxApiHelper
      */
     public static function getAsset(string $muxAssetId): ?MuxAsset
     {
-        $apiClient = static::getApiClient();
+        $apiClient = MuxApiHelper::getApiClient();
         return $apiClient->getAsset($muxAssetId)->getData();
     }
 
@@ -68,65 +69,39 @@ class MuxApiHelper
      */
     public static function deleteAsset(string $muxAssetId): void
     {
-        $apiClient = static::getApiClient();
+        $apiClient = MuxApiHelper::getApiClient();
         $apiClient->deleteAsset($muxAssetId);
     }
 
     /**
-     * @param string $muxPlaybackId
-     * @return string
+     * @param string $muxAssetId
+     * @param string $playbackId
+     * @return void
+     * @throws ApiException
+     * @throws \Exception
      */
-    public static function getStreamUrl(string $muxPlaybackId): string
+    public static function deletePlaybackId(string $muxAssetId, string $playbackId): void
     {
-        return static::MUX_STREAMING_DOMAIN . "/$muxPlaybackId.m3u8";
+        $apiClient = MuxApiHelper::getApiClient();
+        $apiClient->deleteAssetPlaybackId($muxAssetId, $playbackId);
     }
 
     /**
-     * @param string $muxPlaybackId
-     * @param string|null $quality
-     * @param bool $download
-     * @param string|null $filename
-     * @return string
+     * @param string $muxAssetId
+     * @param string $policy
+     * @return PlaybackID|null
+     * @throws ApiException
+     * @throws \Exception
      */
-    public static function getMp4Url(string $muxPlaybackId, ?string $quality = 'medium', bool $download = false, ?string $filename = null): string
+    public static function createPlaybackId(string $muxAssetId, string $policy): ?PlaybackID
     {
-        $quality = $quality ?? 'medium';
-        $url = static::MUX_STREAMING_DOMAIN . "/$muxPlaybackId" . "/$quality.mp4";
-        if ($download) {
-            $filename = $filename ?: $muxPlaybackId;
-            $url .= "?download=$filename";
-        }
-        return $url;
-    }
-
-    /**
-     * @param string $muxPlaybackId
-     * @param array $params
-     * @return string
-     */
-    public static function getImageUrl(string $muxPlaybackId, array $params = []): string
-    {
-
-        if (!isset($params['fit_mode'])) {
-            if (isset($params['width']) && isset($params['height'])) {
-                $params['fit_mode'] = 'smartcrop';
-            } else {
-                $params['fit_mode'] = 'preserve';
-            }
-        }
-
-        return UrlHelper::url(static::MUX_IMAGE_DOMAIN . '/' . $muxPlaybackId . '/thumbnail.jpg', $params);
-
-    }
-
-    /**
-     * @param string $muxPlaybackId
-     * @param array $params
-     * @return string|null
-     */
-    public static function getGifUrl(string $muxPlaybackId, array $params = []): ?string
-    {
-        return UrlHelper::url(static::MUX_IMAGE_DOMAIN . '/' . $muxPlaybackId . "/animated.gif", $params);
+        $apiClient = MuxApiHelper::getApiClient();
+        $createPlaybackIdRequest = new CreatePlaybackIDRequest([
+            'policy' => $policy,
+        ]);
+        return $apiClient
+            ->createAssetPlaybackId($muxAssetId, $createPlaybackIdRequest)
+            ->getData();
     }
 
     /**
